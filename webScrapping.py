@@ -20,26 +20,9 @@ fichier.close()
 #   ===============================
 #   Défintion des variables de base
 #   ===============================
-urlBase = 'http://books.toscrape.com/catalogue/'                                                            # URL à compléter avec celle du livre
-urlCategoryPage = 'http://books.toscrape.com/catalogue/category/books/sports-and-games_17/index.html'       # URL de la catégorie que nous sommes entrain de traiter
-rCategoryPage = requests.get(urlCategoryPage)                                                               # Requête pour scrapper les données de la catégorie choisie
-
-
-#   =========================================
-#   Récupération des URL de chacun des livres
-#   =========================================
-if rCategoryPage.ok:   
-    print('Requête sur : ' + urlCategoryPage + ' réussie !')
-
-    soup = BeautifulSoup(rCategoryPage.text, features="html.parser")
-    listURLNonParsees = soup.find('ol', {'class': 'row'}).findAll('h3')
-    listURLMiParsees = []
-
-    for i in range(len(listURLNonParsees)):
-        listURLMiParsees.append(listURLNonParsees[i].find('a').get('href'))
-
-else:
-    print('Echec de la requête sur : ' + urlCategoryPage)
+urlMultPage = 'index.html'                                              # URL qui sera modifiée si la page que nous sommes entrain de traiter possède d'autres pages
+urlBase = 'http://books.toscrape.com/catalogue/'                        # URL finale à compléter avec celle du livre
+boolAutrePage = True                                                    # Booléan qui nous permettra de sortir de la boucle
 
 
 #   =================================================================
@@ -54,7 +37,7 @@ def recuperationDonneesMono(urlLivre):
 
 
         texteParser = BeautifulSoup(r.text, features="html.parser") # Enregistrement de la réponse HTML dans une variable via la fonction BeautifulSoup parser avec la méthode HTML.parser
-    
+        
         productPageURL = urlLivre
 
         # On place dans un tableau tous les éléments des caractéristiques en bas de page et l'on récupère ceux qui nous intéressent
@@ -80,7 +63,7 @@ def recuperationDonneesMono(urlLivre):
         numberOfStars = reviewRating[1]
 
         return productPageURL, upc, titre, priceIncludingTax, priceExcludingTax, numberAvailable, descriptionProduit, categoryProduct, numberOfStars, imageURL  # Sera return un tuple
-    
+        
     else:
         print('Echec de la requête sur : ' + urlLivre)
 
@@ -90,7 +73,7 @@ def recuperationDonneesMono(urlLivre):
 def ecritureFichierCSV(urlProduit, universal_product_code, title, price_including_tax, price_excluding_tax, number_available, product_description, category, review_rating, image_url):
 
     dataCSV = [(urlProduit, universal_product_code, title, price_including_tax, price_excluding_tax, number_available, product_description, category, review_rating, image_url)]
-    
+        
     fichierCSVOuvert = open('fichierCSVLivres.csv', 'a', newline='', encoding='utf-8')
     objFichierOuvert = csv.writer(fichierCSVOuvert)
 
@@ -99,16 +82,46 @@ def ecritureFichierCSV(urlProduit, universal_product_code, title, price_includin
     fichier.close()
 
 
-#   ==========================================================================
-#   Execution du script python sur x livres présents dans la catégorie choisie
-#   ==========================================================================
-for i in range(len(listURLMiParsees)):
-    urlTemp = listURLMiParsees[i]
-    urlPage = urlBase + urlTemp[9:]
 
-    ecritureFichierCSV(*recuperationDonneesMono(urlPage)) # Appel de la fonction ecritureFichierCSV avec '*' permettant à la fonction de séparer en plusieurs valeurs le tuple
+while boolAutrePage == True:
 
-    
+    urlCategoryPage = 'https://books.toscrape.com/catalogue/category/books/mystery_3/' + str(urlMultPage)       # URL de la page de la catégorie que nous sommes entrain de traiter
+    rCategoryPage = requests.get(urlCategoryPage)                                                               # Requête pour scrapper les données de la catégorie choisie
+
+    #   ===================================================================================
+    #   Récupération des URL de chacun des livres + Check-UP si une autre page est présente
+    #   ===================================================================================
+    if rCategoryPage.ok:   
+        print('Requête sur : ' + urlCategoryPage + ' réussie !')
+
+        soup = BeautifulSoup(rCategoryPage.text, features="html.parser")                                        # Contient les informations de la page de la catégorie
+
+        autrePage = soup.find('ul', {'class': 'pager'}).find('li', {'class': 'next'})                           # On vérifie si un élément li avec la classe next (correspondant au bouton) est présent dans le ul de classe pager
+                                                                        
+        if autrePage == None:                                                                                   # Si cet élément n'existe pas                                                       
+            print("Pas d'autres pages trouvées")
+            boolAutrePage = False                                                                               # CONDITION DE SORTIE DE LA BOUCLE
+        else:
+            autrePage = soup.find('ul', {'class': 'pager'}).find('a').get('href')                               # Si il existe, on récupère le lien du présent dans le bouton
+            urlMultPage = autrePage                                                                             # Et on le place dans une varialbe qui est utilisée pour écrire urlCategoryPage présente plus haut
+            boolAutrePage = True                                                                                # On reste dans notre boucle pour tester la prochaine page
 
 
+        listURLNonParsees = soup.find('ol', {'class': 'row'}).findAll('h3')                                     # On récupère tous les titres H3 présents dans le <ol class=row>
+        listURLMiParsees = []                                                                                   # On crée une liste qui contiendra tous les bouts d'URL de chacun des livres
 
+        for i in range(len(listURLNonParsees)):
+            listURLMiParsees.append(listURLNonParsees[i].find('a').get('href'))                                 # On ajoute les bouts d'URL dans notre liste
+
+    else:
+        print('Echec de la requête sur : ' + urlCategoryPage)
+
+
+    #   ==========================================================================
+    #   Execution du script python sur x livres présents dans la catégorie choisie
+    #   ==========================================================================
+    for i in range(len(listURLMiParsees)):
+        urlTemp = listURLMiParsees[i]
+        urlPage = urlBase + urlTemp[9:]                                                                         # On crée chacun des URL correspondant à chacun des livres de la page
+
+        ecritureFichierCSV(*recuperationDonneesMono(urlPage))                                                   # Appel de la fonction ecritureFichierCSV avec '*' permettant à la fonction de séparer en plusieurs valeurs le tuple
