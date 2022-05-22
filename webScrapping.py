@@ -1,3 +1,8 @@
+# Version du code : 0.3 fait par Robin.S
+# Info : Code Python permettant le Scrapping de chaque livre du site "Books to Scrape" à l'adresse "https://books.toscrape.com/index.html"
+# Todo : Ajout de la fonctionnalité permettant le download des fichiers images de chacun des livres
+# Estimation de temps : x1 après-midi // Fin prévue le 26/05/2022
+
 #   ======================================
 #   Importation des bibliothès nécessaires
 #   ======================================
@@ -24,11 +29,10 @@ def recuperationDonneesMono(urlLivre):
     if r.ok:
         print('Requête sur : ' + urlLivre + ' réussie !')
 
-        texteParser = BeautifulSoup(r.text, features="html.parser") # Enregistrement de la réponse HTML dans une variable via la fonction BeautifulSoup parser avec la méthode HTML.parser
+        texteParser = BeautifulSoup(r.text, features="html.parser")             # Enregistrement de la réponse HTML dans une variable via la fonction BeautifulSoup parser avec la méthode HTML.parser
         productPageURL = urlLivre
 
-        # On place dans un tableau tous les éléments des caractéristiques en bas de page et l'on récupère ceux qui nous intéressent
-        elementsARecuperer = texteParser.findAll('td')
+        elementsARecuperer = texteParser.findAll('td')                          # On place dans un tableau tous les éléments des caractéristiques en bas de page et l'on récupère ceux qui nous intéressent
         if elementsARecuperer[0] == None:
             upc = "Pas d'UPC"
         else:
@@ -200,19 +204,3 @@ for i in range(len(toutesLesCategories)):
 
 
 print("Scrapping du site réussi !")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
