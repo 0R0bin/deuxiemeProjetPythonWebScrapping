@@ -1,7 +1,6 @@
-# Version du code : 0.3 fait par Robin.S
+# Version du code : 0.4 fait par Robin.S
 # Info : Code Python permettant le Scrapping de chaque livre du site "Books to Scrape" à l'adresse "https://books.toscrape.com/index.html"
-# Todo : Ajout de la fonctionnalité permettant le download des fichiers images de chacun des livres
-# Estimation de temps : x1 après-midi // Fin prévue le 26/05/2022
+# Todo : ?
 
 #   ======================================
 #   Importation des bibliothès nécessaires
@@ -9,6 +8,7 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+import string
 
 
 #   ===============================
@@ -17,6 +17,8 @@ import csv
 urlBaseLivre = 'http://books.toscrape.com/catalogue/'                           # URL à compléter avec celle du livre
 urlBaseCategory = 'https://books.toscrape.com/'                                 # URL à compléter avec celle de la catégorie
 url = 'https://books.toscrape.com/index.html'                                   # URL de la page d'acceuil avec la liste des catégories
+valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)              # On impose les caractères valables pour les noms de fichiers
+
 
 
 #   ==============================================================================================================================================
@@ -67,12 +69,22 @@ def recuperationDonneesMono(urlLivre):
             descriptionProduit = (texteParser.find('p', {'class': ''})).text
 
 
-        if (texteParser.find('img').get('src')) == None:                                # Ecriture de la variable imageURL
+
+        if (texteParser.find('img').get('src')) == None:                                # Ecriture de la variable imageURL + Téléchargement de l'image associée
             imageURL = "Pas d'image"
         else:
             imageURLNonCorrigee = texteParser.find('img').get('src')
             imageURLCorrigee = imageURLNonCorrigee[5:]
             imageURL = 'http://books.toscrape.com/' + imageURLCorrigee
+
+            imageDL = requests.get(imageURL).content                                    # On fait une nouvelle requête sur l'URL de l'image pour la télécharger
+
+            nomFichierJPG = ''.join(c for c in titre if c in valid_chars)               # On autorise que les caractères autorisés dans notre nomFichierJPG
+            nomFichierJPG = nomFichierJPG[:100]                                         # On impose une limite de 100 caractères pour le nom du fichier
+
+            with open(nomFichierJPG + '.jpg', 'wb') as imgObj:                          # On crée le fichier qui contiendra l'image
+                imgObj.write(imageDL)                                                   # On télécharge l'image dans notre fichier
+
 
 
         categoryList = texteParser.findAll('li')                                        # Ecriture de la variable categoryProduct
@@ -101,14 +113,14 @@ def recuperationDonneesMono(urlLivre):
 def creationFichierCSV(nomDeLaCategorie):
     donneesCSV = [('product_page_URL', 'universal_ product_code', 'title', 'price_including_tax', 'price_excluding_tax', 'number_available', 'product_description', 'category', 'review_rating', 'image_url')]
     nomFichierCree = 'fichierCSV' + nomDeLaCategorie.replace(" ", "") + '.csv'
-    fichier = open(nomFichierCree, 'w', encoding="utf-8")                           # On crée le fichier
-    obj = csv.writer(fichier)                                                       # On crée l'objet permettant l'écriture dans le fichier
+    fichier = open(nomFichierCree, 'w', encoding="utf-8")                                                               # On crée le fichier
+    obj = csv.writer(fichier)                                                                                           # On crée l'objet permettant l'écriture dans le fichier
 
     for n in donneesCSV:                                            
-        obj.writerow(n)                                                             # On écrit chacun des éléments sur la même ligne
+        obj.writerow(n)                                                                                                 # On écrit chacun des éléments sur la même ligne
     fichier.close()
 
-    return nomFichierCree                                                           # On renvoie le nom du fichier CSV crée afin de le rentrer pour l'écriture des données                   
+    return nomFichierCree                                                                                               # On renvoie le nom du fichier CSV crée afin de le rentrer pour l'écriture des données                   
 
 
 #   =====================================================================================
@@ -118,11 +130,11 @@ def ecritureFichierCSV(nomDuFichierCSV, urlProduit, universal_product_code, titl
 
     dataCSV = [(urlProduit, universal_product_code, title, price_including_tax, price_excluding_tax, number_available, product_description, category, review_rating, image_url)]
         
-    fichierCSVOuvert = open(nomDuFichierCSV, 'a', newline='', encoding='utf-8')         # On ouvre le fichier
-    objFichierOuvert = csv.writer(fichierCSVOuvert)                                     # On crée l'objet permettant l'écriture dans le fichier
+    fichierCSVOuvert = open(nomDuFichierCSV, 'a', newline='', encoding='utf-8')                                         # On ouvre le fichier
+    objFichierOuvert = csv.writer(fichierCSVOuvert)                                                                     # On crée l'objet permettant l'écriture dans le fichier
 
     for i in dataCSV:
-        objFichierOuvert.writerow(i)                                                    # On écrit chacun des éléments sur la même ligne
+        objFichierOuvert.writerow(i)                                                                                    # On écrit chacun des éléments sur la même ligne
     fichierCSVOuvert.close()
 
 
