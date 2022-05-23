@@ -1,7 +1,3 @@
-# Version du code : 0.4 fait par Robin.S
-# Info : Code Python permettant le Scrapping de chaque livre du site "Books to Scrape" à l'adresse "https://books.toscrape.com/index.html"
-# Todo : ?
-
 #   ======================================
 #   Importation des bibliothès nécessaires
 #   ======================================
@@ -9,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import string
+import os
 
 
 #   ===============================
@@ -19,6 +16,34 @@ urlBaseCategory = 'https://books.toscrape.com/'                                 
 url = 'https://books.toscrape.com/index.html'                                   # URL de la page d'acceuil avec la liste des catégories
 valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)              # On impose les caractères valables pour les noms de fichiers
 
+
+#   ====================================================================
+#   Petit script permettant de choisir si l'on traite ou non les données
+#   ====================================================================
+print("Veuillez indiquer si vous souhaitez ou non traiter les données CSV en indiquant oui ou non")
+print("\nEntrez oui ou non (choix par défaut : Oui) \n")
+choixUser = input()                                                              # Bool pour indiquer au programme s'il doit traiter les données envoyées aux fichiers CSV
+
+if choixUser == "Oui" or choixUser == "oui":
+    bTraitement = True
+    print('\nLes données seront traitées (suppression des virugles et pas de texte dans la colonne "Elements restants" \n')
+elif choixUser == "Non" or choixUser == "non":
+    bTraitement = False
+    print("\nLes données ne seront pas traitées et resteront comme demandées à la base \n")
+else:
+    bTraitement = True
+    print("\nChoix par défaut séléctionné car la valeure entrée était innatendue \n")
+    print("Les données seront donc traitées \n")
+
+
+print("Lancement du Scrapping du site : " + url + "\n")
+
+
+#   =======================================================
+#   Fonction enlevant les caractères non ASCII d'une string
+#   =======================================================
+def removeNonASCII(s):
+    return "".join(c for c in s if ord(c)<128)
 
 
 #   ==============================================================================================================================================
@@ -31,77 +56,103 @@ def recuperationDonneesMono(urlLivre):
     if r.ok:
         print('Requête sur : ' + urlLivre + ' réussie !')
 
-        texteParser = BeautifulSoup(r.text, features="html.parser")             # Enregistrement de la réponse HTML dans une variable via la fonction BeautifulSoup parser avec la méthode HTML.parser
-        productPageURL = urlLivre
+        cBook = {}                                                                                      # On crée le dictionnaire qui contiendra toutes les informations de notre livre
 
-        elementsARecuperer = texteParser.findAll('td')                          # On place dans un tableau tous les éléments des caractéristiques en bas de page et l'on récupère ceux qui nous intéressent
+        texteParser = BeautifulSoup(r.text, features="html.parser")                                     # Enregistrement de la réponse HTML dans une variable via la fonction BeautifulSoup parser avec la méthode HTML.parser
+
+        cBook["URLBook"] = urlLivre                     
+
+        elementsARecuperer = texteParser.findAll('td')                                                  # On place dans un tableau tous les éléments des caractéristiques en bas de page et l'on récupère ceux qui nous intéressent
         if elementsARecuperer[0] == None:
-            upc = "Pas d'UPC"
+            cBook["upc"] = "Pas d'UPC"
         else:
-            upc = elementsARecuperer[0].text
+            cBook["upc"] = elementsARecuperer[0].text
 
         if elementsARecuperer[3] == None:
-            priceIncludingTax = 'Pas de prix incluant la taxe'
+            cBook["PrixTTC"] = 'Pas de prix TTC'
         else:
-            priceIncludingTax = elementsARecuperer[3].text
+            if bTraitement == True :
+                prixTTC = removeNonASCII(elementsARecuperer[3].text)                                    # On crée la clé "PrixTTC" en enlevant "£"
+            else:
+                prixTTC = elementsARecuperer[3].text
+            cBook["PrixTTC"] = prixTTC
 
         if elementsARecuperer[2] == None:    
-            priceExcludingTax = 'Pas de prix sans taxes' 
+            cBook["PrixHT"] = 'Pas de prix HT' 
         else:
-            priceExcludingTax = elementsARecuperer[2].text
+            if bTraitement == True:
+                prixHT = removeNonASCII(elementsARecuperer[2].text)                                     # On crée la clé "PrixHT" en enlevant "£"
+            else:
+                prixHT = elementsARecuperer[2].text                                                     # On crée la clé "PrixHT" en enlevant "£"
+            cBook["PrixHT"] = prixHT
 
         if elementsARecuperer[5] == None:
-            numberAvailable = 'Pas de nombre restants'
+            cBook["nbRestants"] = 'Pas de nombre restants'
         else:
-            numberAvailable = elementsARecuperer[5].text
+            if bTraitement == True:
+                SnbRestants = elementsARecuperer[5].text                                                # On rentre la string "In Stock (x Available)"
+                nbRestants = ""                                                                         # On crée la variable qui contiendra le nombre d'éléments restants           
+                for character in SnbRestants:                                                   
+                    if character.isdigit():                                                             # Si le caractère est un nombre            
+                        nbRestants += character                                                         # On l'ajoute à la variable nbRestants
+            else:
+                nbRestants = elementsARecuperer[5].text 
 
+            cBook["nbRestants"] = nbRestants
+            
 
-
-        if (texteParser.find('li', {'class': 'active'})) == None:                       # Ecriture de la variable titre
-            titre = "Pas de titre"
+        if (texteParser.find('li', {'class': 'active'})) == None:                                       # Ecriture de la clé titre
+            cBook["titre"] = "Pas de titre"
         else:
-            titre = (texteParser.find('li', {'class': 'active'})).text
+            cBook["titre"] = (texteParser.find('li', {'class': 'active'})).text
 
 
-        if (texteParser.find('p', {'class': ''})) == None:                              # Ecriture de la variable descriptionProduit
-            descriptionProduit = "Pas de description du livre"
+        if (texteParser.find('p', {'class': ''})) == None:                                              # Ecriture de la clé descriptionProduit
+            cBook["descriptionProduit"] = "Pas de description du livre"
         else:
-            descriptionProduit = (texteParser.find('p', {'class': ''})).text
+            cBook["descriptionProduit"] = removeNonASCII((texteParser.find('p', {'class': ''})).text)
+            if bTraitement == True:                                                                     # Vérification si le fichier CSV doit supprimer les virgules pour lui permettre d'être lu par Excel
+                cBook["descriptionProduit"] = cBook["descriptionProduit"].replace(',', ';')
 
 
-
-        if (texteParser.find('img').get('src')) == None:                                # Ecriture de la variable imageURL + Téléchargement de l'image associée
-            imageURL = "Pas d'image"
+        if (texteParser.find('img').get('src')) == None:                                                # Ecriture de la clé imageURL + Téléchargement de l'image associée
+            cBook["imageURL"] = "Pas d'image"
         else:
             imageURLNonCorrigee = texteParser.find('img').get('src')
             imageURLCorrigee = imageURLNonCorrigee[5:]
-            imageURL = 'http://books.toscrape.com/' + imageURLCorrigee
+            cBook["imageURL"] = 'http://books.toscrape.com/' + imageURLCorrigee
 
-            imageDL = requests.get(imageURL).content                                    # On fait une nouvelle requête sur l'URL de l'image pour la télécharger
+            imageDL = requests.get(cBook["imageURL"]).content                                           # On fait une nouvelle requête sur l'URL de l'image pour la télécharger
 
-            nomFichierJPG = ''.join(c for c in titre if c in valid_chars)               # On autorise que les caractères autorisés dans notre nomFichierJPG
-            nomFichierJPG = nomFichierJPG[:100]                                         # On impose une limite de 100 caractères pour le nom du fichier
+            nomFichierJPG = ''.join(c for c in cBook["titre"] if c in valid_chars)                      # On autorise que les caractères autorisés dans notre nomFichierJPG
+            nomFichierJPG = nomFichierJPG[:100]                                                         # On impose une limite de 100 caractères pour le nom du fichier
+            nomFichierJPG = nomFichierJPG + '.jpg'                                      
+            emplacementFichierPython = os.getcwd()                                                      # On récupère l'emplacement du fichier Python
+            filepath = emplacementFichierPython + '\Images'                                             # On récupère l'emplacement du fichier Python et on rajoute /Images dans le chemin d'accès
 
-            with open(nomFichierJPG + '.jpg', 'wb') as imgObj:                          # On crée le fichier qui contiendra l'image
-                imgObj.write(imageDL)                                                   # On télécharge l'image dans notre fichier
+            cheminEtNomJPG = os.path.join(filepath, nomFichierJPG)                                      # On crée le chemin d'accès avec le nom de notre fichier
+            if not os.path.exists(filepath):                                                            # On vérifie que le dossier Images soit créé
+                os.makedirs(filepath)                                                                   # Si il n'existe pas, on le créer
+
+            with open(cheminEtNomJPG, 'wb') as imgObj:                                                  # On crée le fichier qui contiendra l'image
+                imgObj.write(imageDL)                                                                   # On télécharge l'image dans notre fichier
 
 
-
-        categoryList = texteParser.findAll('li')                                        # Ecriture de la variable categoryProduct
+        categoryList = texteParser.findAll('li')                                                        # Ecriture de la clé categoryProduct
         if categoryList[2] == None:
-            categoryProduct = 'Pas de catégorie'
+            cBook["category"] = 'Pas de catégorie'
         else:
-            categoryProduct = categoryList[2].text
+            cBook["category"] = (categoryList[2].text).replace("\n", "")                                # Ecriture de la clé category + suppression des \n présents
  
 
-        if (texteParser.findAll('p')) == None:                                          # Ecriture de la variable numberOfStars
-            numberOfStars = "Pas de notations"
+        if (texteParser.findAll('p')) == None:                                                          # Ecriture de la clé numberOfStars
+            cBook["Note"] = "Pas de note"
         else:
             reviewRatingList = texteParser.findAll('p')
             reviewRating = reviewRatingList[2].get('class')
-            numberOfStars = reviewRating[1]
+            cBook["Note"] = reviewRating[1]
 
-        return productPageURL, upc, titre, priceIncludingTax, priceExcludingTax, numberAvailable, descriptionProduit, categoryProduct, numberOfStars, imageURL  # Sera return un tuple
+        return cBook
         
     else:
         print('Echec de la requête sur : ' + urlLivre)
@@ -112,23 +163,29 @@ def recuperationDonneesMono(urlLivre):
 #   =================================================================================
 def creationFichierCSV(nomDeLaCategorie):
     donneesCSV = [('product_page_URL', 'universal_ product_code', 'title', 'price_including_tax', 'price_excluding_tax', 'number_available', 'product_description', 'category', 'review_rating', 'image_url')]
-    nomFichierCree = 'fichierCSV' + nomDeLaCategorie.replace(" ", "") + '.csv'
-    fichier = open(nomFichierCree, 'w', encoding="utf-8")                                                               # On crée le fichier
+    nomFichierCSV = 'fichierCSV' + nomDeLaCategorie.replace(" ", "") + '.csv'                                           # On crée un nom de fichier avec la catégorie traitée
+    emplacementFichierPython = os.getcwd()                                                                              # On sauvegarde l'emplacement du fichier Python
+    filepath = emplacementFichierPython + '\FichiersCSV'                                                                # On crée le cheminement pour enregistrer les fichiers CSV
+    cheminEtNomCSV = os.path.join(filepath, nomFichierCSV)                                                              # On crée le chemin d'accès pour notre fichier CSV
+
+    if not os.path.exists(filepath):                                                                                    # On vérifie que le dossier CSV soit créé
+        os.makedirs(filepath)                                                                                           # Si il n'existe pas, on le créer
+
+    fichier = open(cheminEtNomCSV, 'w', encoding="utf-8")                                                               # On crée le fichier
     obj = csv.writer(fichier)                                                                                           # On crée l'objet permettant l'écriture dans le fichier
 
     for n in donneesCSV:                                            
         obj.writerow(n)                                                                                                 # On écrit chacun des éléments sur la même ligne
     fichier.close()
 
-    return nomFichierCree                                                                                               # On renvoie le nom du fichier CSV crée afin de le rentrer pour l'écriture des données                   
+    return cheminEtNomCSV                                                                                               # On renvoie le nom du fichier CSV crée afin de le rentrer pour l'écriture des données                   
 
 
 #   =====================================================================================
 #   Fonction écrivant les données souhaitées dans un fichier CSV nommé "fichierCSVLivres"
 #   =====================================================================================
-def ecritureFichierCSV(nomDuFichierCSV, urlProduit, universal_product_code, title, price_including_tax, price_excluding_tax, number_available, product_description, category, review_rating, image_url):
-
-    dataCSV = [(urlProduit, universal_product_code, title, price_including_tax, price_excluding_tax, number_available, product_description, category, review_rating, image_url)]
+def ecritureFichierCSV(nomDuFichierCSV, cBook):
+    dataCSV = [(cBook['URLBook'], cBook['upc'], cBook['titre'], cBook['PrixTTC'], cBook['PrixHT'], cBook['nbRestants'], cBook['descriptionProduit'], cBook['category'], cBook['Note'], cBook['imageURL'])]
         
     fichierCSVOuvert = open(nomDuFichierCSV, 'a', newline='', encoding='utf-8')                                         # On ouvre le fichier
     objFichierOuvert = csv.writer(fichierCSVOuvert)                                                                     # On crée l'objet permettant l'écriture dans le fichier
@@ -162,18 +219,18 @@ def scrappingAllInCategory(urlDeLaCategorie, nomDeLaCategorie):
             basDePage = soup.find('ul', {'class': 'pager'})                                                             # On recherche un bas de page
                                                                             
             if basDePage == None:                                                                                       # Si cet élément n'existe pas alors on sort de la boucle                                                      
-                print("Pas de bas de page trouvé")
+                print("\nPas de bas de page trouvé, une seule page à scrapper \n")
                 boolAutrePage = False                                                                                   # CONDITION DE SORTIE DE LA BOUCLE
             else:                                                                                                       # Si le bas de page existe on vérifie que le bouton "next" existe
-                print("Un bas de page est présent")
+                print("\nUn bas de page est présent, on vérifie si il y a une page suivante \n")
                 autrePage = basDePage.find('li', {'class': 'next'})                                                     
 
                 if autrePage == None:
-                    print("Pas de pages suivantes")
+                    print("Pas de pages suivantes \n")
                     boolAutrePage = False
 
                 else:
-                    print("Page suivante trouvée")
+                    print("Page suivante trouvée \n")
                     lienPageSuivante = autrePage.find('a').get('href')                                                  # Si il existe, on récupère le lien du présent dans le bouton
                     urlMultPage = lienPageSuivante                                                            
                                                             
@@ -194,7 +251,7 @@ def scrappingAllInCategory(urlDeLaCategorie, nomDeLaCategorie):
             urlTemp = listURLMiParsees[i]
             urlPage = urlBaseLivre + urlTemp[9:]                                                                         # On crée chacun des URL correspondant à chacun des livres de la page
 
-            ecritureFichierCSV(nomDeLaCategorie, *recuperationDonneesMono(urlPage))                                      # Appel de la fonction ecritureFichierCSV avec '*' permettant à la fonction de séparer en plusieurs valeurs le tuple
+            ecritureFichierCSV(nomDeLaCategorie, recuperationDonneesMono(urlPage))                                       # Appel de la fonction ecritureFichierCSV
 
 
 #   =====================================================================
