@@ -140,7 +140,7 @@ def recuperationDonneesMono(urlLivre):
 
         categoryList = texteParser.findAll('li')                                                        # Ecriture de la clé categoryProduct
         if categoryList[2] == None:
-            cBook["category"] = 'Pas de catégorie'
+            cBook["category"] = 'Pas de catégorie'                                                      
         else:
             cBook["category"] = (categoryList[2].text).replace("\n", "")                                # Ecriture de la clé category + suppression des \n présents
  
@@ -238,8 +238,8 @@ def scrappingAllInCategory(urlDeLaCategorie, nomDeLaCategorie):
             listURLNonParsees = soup.find('ol', {'class': 'row'}).findAll('h3')                                         # On récupère tous les titres H3 présents dans le <ol class=row>
             listURLMiParsees = []                                                                                       # On crée une liste qui contiendra tous les bouts d'URL de chacun des livres
 
-            for i in range(len(listURLNonParsees)):
-                listURLMiParsees.append(listURLNonParsees[i].find('a').get('href'))                                     # On ajoute les bouts d'URL dans notre liste
+            for urlNonParsee in listURLNonParsees:
+                listURLMiParsees.append(urlNonParsee.find('a').get('href'))                                             # On ajoute les bouts d'URL dans notre liste
 
         else:
             print('Echec de la requête sur : ' + urlCategoryPage)
@@ -247,8 +247,8 @@ def scrappingAllInCategory(urlDeLaCategorie, nomDeLaCategorie):
         #   ==========================================================================
         #   Execution du script python sur x livres présents dans la catégorie choisie
         #   ==========================================================================
-        for i in range(len(listURLMiParsees)):
-            urlTemp = listURLMiParsees[i]
+        for urlMiParsees in listURLMiParsees:
+            urlTemp = urlMiParsees
             urlPage = urlBaseLivre + urlTemp[9:]                                                                         # On crée chacun des URL correspondant à chacun des livres de la page
 
             ecritureFichierCSV(nomDeLaCategorie, recuperationDonneesMono(urlPage))                                       # Appel de la fonction ecritureFichierCSV
@@ -262,10 +262,10 @@ pagePrincipal = BeautifulSoup(rTotal.text, features="html.parser")
 
 toutesLesCategories = pagePrincipal.find('ul', {'class': 'nav nav-list'}).find('li').findAll('li')
 
-for i in range(len(toutesLesCategories)):
+for uneCategorie in toutesLesCategories:
 
-    finLienCategorie = toutesLesCategories[i].find('a').get('href')
-    nomCategorie = toutesLesCategories[i].find('a').text.replace("\n", "")
+    finLienCategorie = uneCategorie.find('a').get('href')
+    nomCategorie = uneCategorie.find('a').text.replace("\n", "")
     lienCategorie = urlBaseCategory + finLienCategorie
 
     nomFichierCree = creationFichierCSV(nomCategorie)
